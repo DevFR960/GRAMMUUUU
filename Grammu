@@ -1,3 +1,5 @@
+repeat task.wait() until game:IsLoaded()
+
 --// LOAD UI
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
@@ -28,7 +30,7 @@ local Config = {
 local Window = Rayfield:CreateWindow({
     Name = "SINEX_X HUB 💀",
     LoadingTitle = "Loading...",
-    LoadingSubtitle = "FULL SAFE",
+    LoadingSubtitle = "DELTA / XENO SAFE",
     ConfigurationSaving = {Enabled = false}
 })
 
@@ -131,7 +133,7 @@ local function GetTarget()
 end
 
 --// UI
-Combat:CreateToggle({Name="Aimbot",Callback=function(v)Config.Aimbot=v end})
+Combat:CreateToggle({Name="Aimbot (Head Lock)",Callback=function(v)Config.Aimbot=v end})
 Combat:CreateToggle({Name="Silent Aim (Safe)",Callback=function(v)Config.SilentAim=v end})
 Combat:CreateToggle({Name="Wall Check",Callback=function(v)Config.WallCheck=v end})
 Combat:CreateToggle({Name="Hitbox Expander",Callback=function(v)Config.Hitbox=v end})
@@ -162,12 +164,10 @@ RunService.RenderStepped:Connect(function()
 
     GetTarget()
 
-    -- AIMBOT
     if Config.Aimbot and LockedTarget then
         Camera.CFrame=CFrame.lookAt(Camera.CFrame.Position,LockedTarget.Position)
     end
 
-    -- SILENT AIM (SAFE)
     if Config.SilentAim and LockedTarget then
         Camera.CFrame = Camera.CFrame:Lerp(
             CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position),
@@ -197,7 +197,6 @@ RunService.RenderStepped:Connect(function()
             esp.Text.Text=p.Name.." ["..role.."]\nHP: "..hp.." | "..dist.."m"
             esp.Text.TextColor3=color
 
-            -- HITBOX
             if Config.Hitbox then
                 root.Size=Vector3.new(Config.HitboxSize,Config.HitboxSize,Config.HitboxSize)
                 root.Transparency=0.5
@@ -210,7 +209,7 @@ end)
 
 end
 
---// KEY UI
+--// KEY UI (FIXED)
 local KeyWindow = Rayfield:CreateWindow({
     Name = "SINEX_X HUB - KEY",
     LoadingTitle = "Enter Key",
@@ -218,17 +217,20 @@ local KeyWindow = Rayfield:CreateWindow({
     ConfigurationSaving = {Enabled = false}
 })
 
-KeyWindow:CreateInput({
+KeyWindow:CreateTextbox({
     Name = "Enter Key",
-    PlaceholderText = "SINEX_X555",
+    PlaceholderText = "Type key here...",
+    RemoveTextAfterFocusLost = false,
     Callback = function(text)
         if text == correctKey then
-            Rayfield:Notify({Title="Access Granted",Content="Welcome 💀",Duration=3})
+            Rayfield:Notify({
+                Title = "Access Granted",
+                Content = "Welcome 💀",
+                Duration = 3
+            })
             task.wait(1)
             KeyWindow:Destroy()
             startSINEX()
-        else
-            Rayfield:Notify({Title="Wrong Key",Content="❌",Duration=3})
         end
     end
 })
