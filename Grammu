@@ -1,21 +1,26 @@
 repeat task.wait() until game:IsLoaded()
 
---// LOAD UI
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+--// CLEAN OLD UI
+pcall(function()
+    game.CoreGui:FindFirstChild("SINEX_KEY"):Destroy()
+end)
 
 --// KEY
 local correctKey = "SINEX_X555"
 
---// MAIN
+--// MAIN FUNCTION
 function startSINEX()
 
---// SERVICES
+-- LOAD UI (after key = no conflict)
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+-- SERVICES
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
---// CONFIG
+-- CONFIG
 local Config = {
     ESP = true,
     Aimbot = false,
@@ -27,7 +32,7 @@ local Config = {
     FOV = 200
 }
 
---// UI
+-- UI
 local Window = Rayfield:CreateWindow({
     Name = "SINEX_X HUB 💀",
     LoadingTitle = "Loading...",
@@ -38,38 +43,26 @@ local Window = Rayfield:CreateWindow({
 local Combat = Window:CreateTab("Combat")
 local Visual = Window:CreateTab("Visual")
 
---// FOV
+-- FOV CIRCLE
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Thickness = 2
 FOVCircle.NumSides = 100
 FOVCircle.Filled = false
 FOVCircle.Color = Color3.fromRGB(0,255,255)
 
---// FUNCTIONS
+-- FUNCTIONS
 local function GetHealth(c)
-    local h=c:FindFirstChildOfClass("Humanoid")
+    local h = c:FindFirstChildOfClass("Humanoid")
     return h and h.Health or 0
 end
 
--- ROLE
 local function GetRole(p, char)
     if p.Team and p.Team.Name ~= "" then
         return p.Team.Name
     end
-
-    local ls = p:FindFirstChild("leaderstats")
-    if ls then
-        for _,v in pairs(ls:GetChildren()) do
-            if tostring(v.Name):lower():find("team") then
-                return tostring(v.Value)
-            end
-        end
-    end
-
     return "Unknown"
 end
 
--- COLOR
 local function GetColor(role)
     role = tostring(role):lower()
 
@@ -84,17 +77,11 @@ local function GetColor(role)
     return Color3.fromRGB(255,255,255)
 end
 
--- TEAM CHECK
 local function IsEnemy(p, char)
     if not Config.TeamCheck then return true end
-
-    local myRole = GetRole(LocalPlayer, LocalPlayer.Character)
-    local targetRole = GetRole(p, char)
-
-    return myRole ~= targetRole
+    return GetRole(LocalPlayer, LocalPlayer.Character) ~= GetRole(p, char)
 end
 
--- WALL CHECK
 local function IsVisible(part)
     if not Config.WallCheck then return true end
 
@@ -113,59 +100,59 @@ end
 local ESP = {}
 
 local function CreateESP(p)
-    if p==LocalPlayer then return end
+    if p == LocalPlayer then return end
 
-    local bill=Instance.new("BillboardGui")
-    bill.Size=UDim2.new(0,200,0,50)
-    bill.AlwaysOnTop=true
-    bill.Parent=game.CoreGui
+    local bill = Instance.new("BillboardGui")
+    bill.Size = UDim2.new(0,200,0,50)
+    bill.AlwaysOnTop = true
+    bill.Parent = game.CoreGui
 
-    local txt=Instance.new("TextLabel")
-    txt.Size=UDim2.new(1,0,1,0)
-    txt.BackgroundTransparency=1
-    txt.TextScaled=true
-    txt.TextStrokeTransparency=0
-    txt.Parent=bill
+    local txt = Instance.new("TextLabel")
+    txt.Size = UDim2.new(1,0,1,0)
+    txt.BackgroundTransparency = 1
+    txt.TextScaled = true
+    txt.TextStrokeTransparency = 0
+    txt.Parent = bill
 
-    ESP[p]={GUI=bill,Text=txt}
+    ESP[p] = {GUI=bill,Text=txt}
 end
 
 for _,p in pairs(Players:GetPlayers()) do CreateESP(p) end
 Players.PlayerAdded:Connect(CreateESP)
 
 -- TARGET
-local LockedTarget=nil
+local LockedTarget = nil
 
 local function GetTarget()
-    local closest=nil
-    local shortest=Config.FOV^2
+    local closest = nil
+    local shortest = Config.FOV^2
 
     for _,p in pairs(Players:GetPlayers()) do
-        if p~=LocalPlayer and p.Character then
-            local c=p.Character
-            local head=c:FindFirstChild("Head")
+        if p ~= LocalPlayer and p.Character then
+            local c = p.Character
+            local head = c:FindFirstChild("Head")
 
-            if head and GetHealth(c)>0 and IsEnemy(p,c) and IsVisible(head) then
-                local pos,vis=Camera:WorldToViewportPoint(head.Position)
+            if head and GetHealth(c) > 0 and IsEnemy(p,c) and IsVisible(head) then
+                local pos,vis = Camera:WorldToViewportPoint(head.Position)
 
                 if vis then
-                    local dx=pos.X-Camera.ViewportSize.X/2
-                    local dy=pos.Y-Camera.ViewportSize.Y/2
-                    local dist=dx*dx+dy*dy
+                    local dx = pos.X - Camera.ViewportSize.X/2
+                    local dy = pos.Y - Camera.ViewportSize.Y/2
+                    local dist = dx*dx + dy*dy
 
-                    if dist<shortest then
-                        shortest=dist
-                        closest=head
+                    if dist < shortest then
+                        shortest = dist
+                        closest = head
                     end
                 end
             end
         end
     end
 
-    LockedTarget=closest
+    LockedTarget = closest
 end
 
--- UI
+-- UI CONTROLS
 Combat:CreateToggle({Name="Aimbot (Head Lock)",Callback=function(v)Config.Aimbot=v end})
 Combat:CreateToggle({Name="Silent Aim (Soft)",Callback=function(v)Config.SilentAim=v end})
 Combat:CreateToggle({Name="Team Check",Callback=function(v)Config.TeamCheck=v end})
@@ -191,16 +178,19 @@ Visual:CreateSlider({
 -- LOOP
 RunService.RenderStepped:Connect(function()
 
+    -- FOV
     FOVCircle.Radius = Config.FOV
     FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     FOVCircle.Visible = Config.Aimbot
 
     GetTarget()
 
+    -- AIMBOT
     if Config.Aimbot and LockedTarget then
         Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position)
     end
 
+    -- SILENT AIM (SOFT)
     if Config.SilentAim and LockedTarget then
         Camera.CFrame = Camera.CFrame:Lerp(
             CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position),
@@ -208,34 +198,35 @@ RunService.RenderStepped:Connect(function()
         )
     end
 
+    -- ESP
     for _,p in pairs(Players:GetPlayers()) do
-        if p~=LocalPlayer then
-            local esp=ESP[p]
-            local c=p.Character
+        if p ~= LocalPlayer then
+            local esp = ESP[p]
+            local c = p.Character
 
             if not esp or not c then continue end
 
-            local root=c:FindFirstChild("HumanoidRootPart")
+            local root = c:FindFirstChild("HumanoidRootPart")
 
-            if not root or GetHealth(c)<=0 or not Config.ESP or not IsEnemy(p,c) then
-                esp.GUI.Enabled=false
+            if not root or GetHealth(c) <= 0 or not Config.ESP or not IsEnemy(p,c) then
+                esp.GUI.Enabled = false
                 continue
             end
 
-            local hp=math.floor(GetHealth(c))
-            local dist=math.floor((root.Position-Camera.CFrame.Position).Magnitude)
-            local role=GetRole(p,c)
-            local color=GetColor(role)
+            local hp = math.floor(GetHealth(c))
+            local dist = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
+            local role = GetRole(p,c)
+            local color = GetColor(role)
 
-            esp.GUI.Adornee=root
-            esp.GUI.Enabled=true
-            esp.Text.Text=p.Name.." ["..role.."]\nHP: "..hp.." | "..dist.."m"
-            esp.Text.TextColor3=color
+            esp.GUI.Adornee = root
+            esp.GUI.Enabled = true
+            esp.Text.Text = p.Name.." ["..role.."]\nHP: "..hp.." | "..dist.."m"
+            esp.Text.TextColor3 = color
 
             if Config.Hitbox then
-                root.Size=Vector3.new(Config.HitboxSize,Config.HitboxSize,Config.HitboxSize)
-                root.Transparency=0.5
-                root.CanCollide=false
+                root.Size = Vector3.new(Config.HitboxSize,Config.HitboxSize,Config.HitboxSize)
+                root.Transparency = 0.5
+                root.CanCollide = false
             end
         end
     end
@@ -244,34 +235,53 @@ end)
 
 end
 
---// KEY UI
-local KeyWindow = Rayfield:CreateWindow({
-    Name = "SINEX_X HUB - KEY",
-    LoadingTitle = "Enter Key",
-    LoadingSubtitle = "Mobile Supported",
-    ConfigurationSaving = {Enabled = false}
-})
+--// KEY UI (ALWAYS SHOW)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SINEX_KEY"
+ScreenGui.Parent = game.CoreGui
 
-KeyWindow:CreateInput({
-    Name = "Enter Key",
-    PlaceholderText = "Type key here...",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(text)
-        if text == correctKey then
-            Rayfield:Notify({
-                Title = "Access Granted",
-                Content = "Welcome 💀",
-                Duration = 3
-            })
-            task.wait(1)
-            KeyWindow:Destroy()
-            startSINEX()
-        else
-            Rayfield:Notify({
-                Title = "Wrong Key ❌",
-                Content = "Try again",
-                Duration = 3
-            })
-        end
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0,300,0,150)
+Frame.Position = UDim2.new(0.5,-150,0.5,-75)
+Frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+Frame.Parent = ScreenGui
+
+Instance.new("UICorner", Frame)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1,0,0,40)
+Title.BackgroundTransparency = 1
+Title.Text = "SINEX_X HUB KEY"
+Title.TextColor3 = Color3.fromRGB(255,255,255)
+Title.TextScaled = true
+Title.Parent = Frame
+
+local Box = Instance.new("TextBox")
+Box.Size = UDim2.new(0.8,0,0,40)
+Box.Position = UDim2.new(0.1,0,0.4,0)
+Box.PlaceholderText = "Enter Key..."
+Box.Text = ""
+Box.TextScaled = true
+Box.BackgroundColor3 = Color3.fromRGB(40,40,40)
+Box.TextColor3 = Color3.fromRGB(255,255,255)
+Box.Parent = Frame
+
+local Btn = Instance.new("TextButton")
+Btn.Size = UDim2.new(0.6,0,0,35)
+Btn.Position = UDim2.new(0.2,0,0.75,0)
+Btn.Text = "ENTER"
+Btn.TextScaled = true
+Btn.BackgroundColor3 = Color3.fromRGB(0,170,255)
+Btn.TextColor3 = Color3.fromRGB(255,255,255)
+Btn.Parent = Frame
+
+Btn.MouseButton1Click:Connect(function()
+    if Box.Text == correctKey then
+        ScreenGui:Destroy()
+        startSINEX()
+    else
+        Btn.Text = "WRONG KEY ❌"
+        task.wait(1)
+        Btn.Text = "ENTER"
     end
-})
+end)
