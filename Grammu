@@ -1,17 +1,14 @@
 repeat task.wait() until game:IsLoaded()
 
---// CLEAN OLD UI
 pcall(function()
     game.CoreGui:FindFirstChild("SINEX_KEY"):Destroy()
 end)
 
---// KEY
 local correctKey = "SINEX_X555"
 
---// MAIN FUNCTION
 function startSINEX()
 
--- LOAD UI (after key = no conflict)
+-- LOAD UI
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
 -- SERVICES
@@ -43,7 +40,7 @@ local Window = Rayfield:CreateWindow({
 local Combat = Window:CreateTab("Combat")
 local Visual = Window:CreateTab("Visual")
 
--- FOV CIRCLE
+-- FOV
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Thickness = 2
 FOVCircle.NumSides = 100
@@ -65,7 +62,6 @@ end
 
 local function GetColor(role)
     role = tostring(role):lower()
-
     if role:find("scp") then return Color3.fromRGB(255,105,180)
     elseif role:find("class") then return Color3.fromRGB(255,170,0)
     elseif role:find("guard") then return Color3.fromRGB(220,240,255)
@@ -73,7 +69,6 @@ local function GetColor(role)
     elseif role:find("chaos") then return Color3.fromRGB(0,200,0)
     elseif role:find("serpent") then return Color3.fromRGB(255,0,0)
     end
-
     return Color3.fromRGB(255,255,255)
 end
 
@@ -96,11 +91,12 @@ local function IsVisible(part)
     return not result or result.Instance:IsDescendantOf(part.Parent)
 end
 
--- ESP
+-- ESP SYSTEM
 local ESP = {}
 
 local function CreateESP(p)
     if p == LocalPlayer then return end
+    if ESP[p] then return end
 
     local bill = Instance.new("BillboardGui")
     bill.Size = UDim2.new(0,200,0,50)
@@ -119,6 +115,14 @@ end
 
 for _,p in pairs(Players:GetPlayers()) do CreateESP(p) end
 Players.PlayerAdded:Connect(CreateESP)
+
+-- FIX ESP REMOVE
+Players.PlayerRemoving:Connect(function(p)
+    if ESP[p] then
+        if ESP[p].GUI then ESP[p].GUI:Destroy() end
+        ESP[p] = nil
+    end
+end)
 
 -- TARGET
 local LockedTarget = nil
@@ -152,12 +156,12 @@ local function GetTarget()
     LockedTarget = closest
 end
 
--- UI CONTROLS
-Combat:CreateToggle({Name="Aimbot (Head Lock)",Callback=function(v)Config.Aimbot=v end})
-Combat:CreateToggle({Name="Silent Aim (Soft)",Callback=function(v)Config.SilentAim=v end})
+-- UI
+Combat:CreateToggle({Name="Aimbot",Callback=function(v)Config.Aimbot=v end})
+Combat:CreateToggle({Name="Silent Aim",Callback=function(v)Config.SilentAim=v end})
 Combat:CreateToggle({Name="Team Check",Callback=function(v)Config.TeamCheck=v end})
 Combat:CreateToggle({Name="Wall Check",Callback=function(v)Config.WallCheck=v end})
-Combat:CreateToggle({Name="Hitbox Expander",Callback=function(v)Config.Hitbox=v end})
+Combat:CreateToggle({Name="Hitbox",Callback=function(v)Config.Hitbox=v end})
 
 Combat:CreateSlider({
     Name="Hitbox Size",
@@ -169,14 +173,18 @@ Combat:CreateSlider({
 Visual:CreateToggle({Name="ESP",Callback=function(v)Config.ESP=v end})
 
 Visual:CreateSlider({
-    Name="FOV Size",
+    Name="FOV",
     Range={50,400},
     CurrentValue=200,
     Callback=function(v)Config.FOV=v end
 })
 
--- LOOP
+-- OPTIMIZED LOOP
+local last = 0
+
 RunService.RenderStepped:Connect(function()
+    if tick() - last < 0.05 then return end
+    last = tick()
 
     -- FOV
     FOVCircle.Radius = Config.FOV
@@ -190,7 +198,6 @@ RunService.RenderStepped:Connect(function()
         Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position)
     end
 
-    -- SILENT AIM (SOFT)
     if Config.SilentAim and LockedTarget then
         Camera.CFrame = Camera.CFrame:Lerp(
             CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position),
@@ -198,82 +205,83 @@ RunService.RenderStepped:Connect(function()
         )
     end
 
-    -- ESP
-    for _,p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            local esp = ESP[p]
-            local c = p.Character
+    -- ESP OFF
+    if not Config.ESP then
+        for _,v in pairs(ESP) do
+            if v.GUI then v.GUI.Enabled = false end
+        end
+    end
 
-            if not esp or not c then continue end
+    -- PLAYER LOOP
+    for p,esp in pairs(ESP) do
+        if not p or not p.Parent then
+            if esp.GUI then esp.GUI:Destroy() end
+            ESP[p] = nil
+            continue
+        end
 
-            local root = c:FindFirstChild("HumanoidRootPart")
+        local c = p.Character
+        if not c then
+            esp.GUI.Enabled = false
+            continue
+        end
 
-            if not root or GetHealth(c) <= 0 or not Config.ESP or not IsEnemy(p,c) then
-                esp.GUI.Enabled = false
-                continue
-            end
+        local root = c:FindFirstChild("HumanoidRootPart")
 
+        if not root or GetHealth(c) <= 0 or not Config.ESP or not IsEnemy(p,c) then
+            esp.GUI.Enabled = false
+        else
             local hp = math.floor(GetHealth(c))
             local dist = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
             local role = GetRole(p,c)
-            local color = GetColor(role)
 
             esp.GUI.Adornee = root
             esp.GUI.Enabled = true
             esp.Text.Text = p.Name.." ["..role.."]\nHP: "..hp.." | "..dist.."m"
-            esp.Text.TextColor3 = color
+            esp.Text.TextColor3 = GetColor(role)
+        end
 
-            if Config.Hitbox then
-                root.Size = Vector3.new(Config.HitboxSize,Config.HitboxSize,Config.HitboxSize)
-                root.Transparency = 0.5
-                root.CanCollide = false
-            end
+        -- HITBOX
+        if Config.Hitbox and root then
+            root.Size = Vector3.new(Config.HitboxSize,Config.HitboxSize,Config.HitboxSize)
+            root.Transparency = 0.5
+            root.CanCollide = false
+        elseif root then
+            root.Size = Vector3.new(2,2,1)
+            root.Transparency = 0
+            root.CanCollide = true
         end
     end
-
 end)
 
 end
 
---// KEY UI (ALWAYS SHOW)
-local ScreenGui = Instance.new("ScreenGui")
+-- KEY UI
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 ScreenGui.Name = "SINEX_KEY"
-ScreenGui.Parent = game.CoreGui
 
-local Frame = Instance.new("Frame")
+local Frame = Instance.new("Frame", ScreenGui)
 Frame.Size = UDim2.new(0,300,0,150)
 Frame.Position = UDim2.new(0.5,-150,0.5,-75)
 Frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-Frame.Parent = ScreenGui
-
 Instance.new("UICorner", Frame)
 
-local Title = Instance.new("TextLabel")
+local Title = Instance.new("TextLabel", Frame)
 Title.Size = UDim2.new(1,0,0,40)
 Title.BackgroundTransparency = 1
 Title.Text = "SINEX_X HUB KEY"
 Title.TextColor3 = Color3.fromRGB(255,255,255)
 Title.TextScaled = true
-Title.Parent = Frame
 
-local Box = Instance.new("TextBox")
+local Box = Instance.new("TextBox", Frame)
 Box.Size = UDim2.new(0.8,0,0,40)
 Box.Position = UDim2.new(0.1,0,0.4,0)
 Box.PlaceholderText = "Enter Key..."
-Box.Text = ""
-Box.TextScaled = true
-Box.BackgroundColor3 = Color3.fromRGB(40,40,40)
-Box.TextColor3 = Color3.fromRGB(255,255,255)
-Box.Parent = Frame
 
-local Btn = Instance.new("TextButton")
+local Btn = Instance.new("TextButton", Frame)
 Btn.Size = UDim2.new(0.6,0,0,35)
 Btn.Position = UDim2.new(0.2,0,0.75,0)
 Btn.Text = "ENTER"
-Btn.TextScaled = true
-Btn.BackgroundColor3 = Color3.fromRGB(0,170,255)
-Btn.TextColor3 = Color3.fromRGB(255,255,255)
-Btn.Parent = Frame
 
 Btn.MouseButton1Click:Connect(function()
     if Box.Text == correctKey then
