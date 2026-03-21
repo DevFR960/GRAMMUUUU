@@ -4,8 +4,8 @@ local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 --// KEY
 local correctKey = "SINEX_X555"
 
---// FUNCTION หลัก
-local function startCOCOHub()
+--// MAIN FUNCTION
+local function startSINEX()
 
 --// SERVICES
 local Players = game:GetService("Players")
@@ -24,139 +24,97 @@ local Config = {
 
 --// UI
 local Window = Rayfield:CreateWindow({
-    Name = "SCP Retrobreach GOD 💀",
+    Name = "SINEX_X HUB 💀",
     LoadingTitle = "Loading...",
-    LoadingSubtitle = "SAFE MODE",
+    LoadingSubtitle = "XENO / DELTA SAFE",
     ConfigurationSaving = {Enabled = false}
 })
 
 local Combat = Window:CreateTab("Combat")
 local Visual = Window:CreateTab("Visual")
 
---// FOV
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 2
-FOVCircle.NumSides = 60
-FOVCircle.Filled = false
-FOVCircle.Color = Color3.fromRGB(0,255,255)
+--// FOV (GUI VERSION FOR DELTA)
+local FOVFrame = Instance.new("Frame")
+FOVFrame.Size = UDim2.new(0,200,0,200)
+FOVFrame.AnchorPoint = Vector2.new(0.5,0.5)
+FOVFrame.Position = UDim2.new(0.5,0,0.5,0)
+FOVFrame.BackgroundTransparency = 1
+FOVFrame.Parent = game.CoreGui
+
+local Stroke = Instance.new("UIStroke", FOVFrame)
+Stroke.Thickness = 2
+Stroke.Color = Color3.fromRGB(0,255,255)
+
+local Corner = Instance.new("UICorner", FOVFrame)
+Corner.CornerRadius = UDim.new(1,0)
 
 --// STORAGE
 local ESP = {}
 local LockedTarget = nil
 
---// ROLE DETECT
-local function GetRole(p, char)
+--// ROLE
+local function GetRole(p, c)
     if p.Team then return p.Team.Name end
-
-    local ls = p:FindFirstChild("leaderstats")
-    if ls then
-        for _,v in pairs(ls:GetChildren()) do
-            if tostring(v.Name):lower():find("team") then
-                return tostring(v.Value)
-            end
-        end
-    end
-
-    if char then
-        for _,v in pairs(char:GetChildren()) do
-            if v:IsA("StringValue") and tostring(v.Name):lower():find("role") then
-                return tostring(v.Value)
-            end
-        end
-
-        for _,attr in pairs(char:GetAttributes()) do
-            if typeof(attr)=="string" then
-                return attr
-            end
-        end
-    end
-
     return "Unknown"
 end
 
---// COLOR
+--// COLORS
 local function GetRoleColor(role)
     role = tostring(role):lower()
 
-    if role:find("scp") then
-        return Color3.fromRGB(255,105,180)
-    elseif role:find("class") or role:find("cd") then
-        return Color3.fromRGB(255,170,0)
-    elseif role:find("security") or role:find("guard") or role:find("sd") then
-        return Color3.fromRGB(150,200,255)
-    elseif role:find("chaos") or role:find("ci") then
-        return Color3.fromRGB(0,200,0)
-    elseif role:find("serpent") or role:find("hand") or role:find("sh") then
-        return Color3.fromRGB(255,0,0)
-    elseif role:find("foundation") or role:find("fp") then
-        return Color3.fromRGB(255,255,255)
-    elseif role:find("mtf") then
-        return Color3.fromRGB(0,120,255)
-    elseif role:find("goc") then
-        return Color3.fromRGB(170,0,255)
+    if role:find("scp") then return Color3.fromRGB(255,105,180)
+    elseif role:find("class") then return Color3.fromRGB(255,170,0)
+    elseif role:find("guard") then return Color3.fromRGB(150,200,255)
+    elseif role:find("chaos") then return Color3.fromRGB(0,200,0)
+    elseif role:find("serpent") then return Color3.fromRGB(255,0,0)
+    elseif role:find("mtf") then return Color3.fromRGB(0,120,255)
     end
 
     return Color3.fromRGB(255,255,255)
 end
 
 --// HEALTH
-local function GetHealth(char)
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then return hum.Health end
-    return 0
+local function GetHealth(c)
+    local h = c:FindFirstChildOfClass("Humanoid")
+    return h and h.Health or 0
 end
 
---// TEAM CHECK
-local function IsEnemy(p)
-    if not Config.TeamCheck then return true end
-    return p.Team ~= LocalPlayer.Team
-end
-
---// CREATE ESP
+--// ESP
 local function CreateESP(p)
     if p == LocalPlayer then return end
 
-    local gui = Instance.new("BillboardGui")
-    gui.Size = UDim2.new(0,200,0,50)
-    gui.AlwaysOnTop = true
-    gui.Parent = game.CoreGui
+    local bill = Instance.new("BillboardGui")
+    bill.Size = UDim2.new(0,200,0,50)
+    bill.AlwaysOnTop = true
+    bill.Parent = game.CoreGui
 
-    local text = Instance.new("TextLabel")
-    text.Size = UDim2.new(1,0,1,0)
-    text.BackgroundTransparency = 1
-    text.TextScaled = true
-    text.TextStrokeTransparency = 0
-    text.Font = Enum.Font.SourceSansBold
-    text.Parent = gui
+    local txt = Instance.new("TextLabel")
+    txt.Size = UDim2.new(1,0,1,0)
+    txt.BackgroundTransparency = 1
+    txt.TextScaled = true
+    txt.TextStrokeTransparency = 0
+    txt.Parent = bill
 
-    local hl = Instance.new("Highlight")
-    hl.FillTransparency = 0.5
-    hl.Parent = game.CoreGui
-
-    ESP[p] = {GUI=gui,Text=text,HL=hl}
+    ESP[p] = {GUI=bill,Text=txt}
 end
 
 for _,p in pairs(Players:GetPlayers()) do CreateESP(p) end
 Players.PlayerAdded:Connect(CreateESP)
 
---// TARGET (HEAD LOCK)
+--// TARGET
 local function GetTarget()
     local closest=nil
-    local shortest=Config.FOV*Config.FOV
+    local shortest=Config.FOV^2
 
     for _,p in pairs(Players:GetPlayers()) do
         if p~=LocalPlayer and p.Character then
-            local char=p.Character
-            local head=char:FindFirstChild("Head")
-
-            if head and GetHealth(char)>0 and IsEnemy(p) then
+            local head=p.Character:FindFirstChild("Head")
+            if head and GetHealth(p.Character)>0 then
                 local pos,vis=Camera:WorldToViewportPoint(head.Position)
-
                 if vis then
                     local dx=pos.X-Camera.ViewportSize.X/2
                     local dy=pos.Y-Camera.ViewportSize.Y/2
                     local dist=dx*dx+dy*dy
-
                     if dist<shortest then
                         shortest=dist
                         closest=head
@@ -169,62 +127,35 @@ local function GetTarget()
     LockedTarget=closest
 end
 
---// UI CONTROLS
+--// UI
 Combat:CreateToggle({
     Name = "Aimbot (Head Lock)",
     CurrentValue = false,
-    Callback = function(v)
-        Config.Aimbot = v
-    end
-})
-
-Combat:CreateToggle({
-    Name = "Team Check",
-    CurrentValue = false,
-    Callback = function(v)
-        Config.TeamCheck = v
-    end
+    Callback = function(v) Config.Aimbot=v end
 })
 
 Visual:CreateToggle({
     Name = "ESP",
     CurrentValue = true,
-    Callback = function(v)
-        Config.ESP = v
-    end
-})
-
-Visual:CreateToggle({
-    Name = "Show FOV",
-    CurrentValue = true,
-    Callback = function(v)
-        Config.ShowFOV = v
-    end
+    Callback = function(v) Config.ESP=v end
 })
 
 Visual:CreateSlider({
     Name = "FOV Size",
-    Range = {50,500},
-    Increment = 10,
+    Range = {50,400},
     CurrentValue = 200,
     Callback = function(v)
-        Config.FOV = v
+        Config.FOV=v
+        FOVFrame.Size = UDim2.new(0,v,0,v)
     end
 })
 
 --// LOOP
-local Last=0
-
 RunService.RenderStepped:Connect(function()
 
-    FOVCircle.Radius=Config.FOV
-    FOVCircle.Position=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)
-    FOVCircle.Visible=Config.ShowFOV and Config.Aimbot
+    FOVFrame.Visible = Config.ShowFOV and Config.Aimbot
 
-    if tick()-Last>0.1 then
-        GetTarget()
-        Last=tick()
-    end
+    GetTarget()
 
     if Config.Aimbot and LockedTarget then
         Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position)
@@ -233,71 +164,48 @@ RunService.RenderStepped:Connect(function()
     for _,p in pairs(Players:GetPlayers()) do
         if p~=LocalPlayer then
             local esp=ESP[p]
-            local char=p.Character
+            local c=p.Character
+            if not esp or not c then continue end
 
-            if not esp or not char then continue end
-
-            local root=char:FindFirstChild("HumanoidRootPart")
-            if not root then
+            local root=c:FindFirstChild("HumanoidRootPart")
+            if not root or GetHealth(c)<=0 or not Config.ESP then
                 esp.GUI.Enabled=false
-                esp.HL.Enabled=false
                 continue
             end
 
-            local hp=math.floor(GetHealth(char))
-            if hp<=0 or not Config.ESP then
-                esp.GUI.Enabled=false
-                esp.HL.Enabled=false
-                continue
-            end
-
-            local dist=math.floor((root.Position-Camera.CFrame.Position).Magnitude)
-            local role=GetRole(p,char)
+            local role=GetRole(p,c)
             local color=GetRoleColor(role)
 
             esp.GUI.Adornee=root
             esp.GUI.Enabled=true
-            esp.Text.Text=p.Name.." ["..role.."]\nHP:"..hp.." | "..dist.."m"
+            esp.Text.Text=p.Name.." ["..role.."]"
             esp.Text.TextColor3=color
-
-            esp.HL.Adornee=char
-            esp.HL.FillColor=color
-            esp.HL.OutlineColor=color
-            esp.HL.Enabled=true
         end
     end
 
 end)
 
-end -- END FUNCTION
+end
 
 --// KEY UI
 local KeyWindow = Rayfield:CreateWindow({
-    Name = "SINEX_X HUB - Key System",
+    Name = "SINEX_X HUB - KEY",
     LoadingTitle = "Enter Key",
-    LoadingSubtitle = "SCP RETROBREACH",
+    LoadingSubtitle = "Mobile Supported",
     ConfigurationSaving = {Enabled = false}
 })
 
 KeyWindow:CreateInput({
     Name = "Enter Key",
-    PlaceholderText = "Type key here...",
+    PlaceholderText = "SINEX_X555",
     Callback = function(text)
         if text == correctKey then
-            Rayfield:Notify({
-                Title = "Access Granted",
-                Content = "Welcome 💀",
-                Duration = 3
-            })
+            Rayfield:Notify({Title="Access Granted",Content="Welcome 💀",Duration=3})
             task.wait(1)
             KeyWindow:Destroy()
-            startCOCOHub()
+            startSINEX()
         else
-            Rayfield:Notify({
-                Title = "Wrong Key",
-                Content = "❌",
-                Duration = 3
-            })
+            Rayfield:Notify({Title="Wrong Key",Content="❌",Duration=3})
         end
     end
 })
