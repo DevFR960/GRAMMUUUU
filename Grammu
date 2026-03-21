@@ -4,7 +4,7 @@ local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 --// KEY
 local correctKey = "SINEX_X555"
 
---// MAIN FUNCTION
+--// MAIN
 local function startSINEX()
 
 --// SERVICES
@@ -17,51 +17,58 @@ local Camera = workspace.CurrentCamera
 local Config = {
     ESP = true,
     Aimbot = false,
-    TeamCheck = false,
-    FOV = 200,
-    ShowFOV = true
+    SilentAim = false,
+    WallCheck = false,
+    Hitbox = false,
+    HitboxSize = 5,
+    FOV = 200
 }
 
 --// UI
 local Window = Rayfield:CreateWindow({
     Name = "SINEX_X HUB 💀",
     LoadingTitle = "Loading...",
-    LoadingSubtitle = "XENO / DELTA SAFE",
+    LoadingSubtitle = "FULL SAFE",
     ConfigurationSaving = {Enabled = false}
 })
 
 local Combat = Window:CreateTab("Combat")
 local Visual = Window:CreateTab("Visual")
 
---// FOV (GUI VERSION FOR DELTA)
-local FOVFrame = Instance.new("Frame")
-FOVFrame.Size = UDim2.new(0,200,0,200)
-FOVFrame.AnchorPoint = Vector2.new(0.5,0.5)
-FOVFrame.Position = UDim2.new(0.5,0,0.5,0)
-FOVFrame.BackgroundTransparency = 1
-FOVFrame.Parent = game.CoreGui
+--// FOV (SAFE)
+local FOV = Instance.new("Frame")
+FOV.Size = UDim2.new(0,200,0,200)
+FOV.AnchorPoint = Vector2.new(0.5,0.5)
+FOV.Position = UDim2.new(0.5,0,0.5,0)
+FOV.BackgroundTransparency = 1
+FOV.Parent = game.CoreGui
 
-local Stroke = Instance.new("UIStroke", FOVFrame)
-Stroke.Thickness = 2
-Stroke.Color = Color3.fromRGB(0,255,255)
+local stroke = Instance.new("UIStroke",FOV)
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(0,255,255)
 
-local Corner = Instance.new("UICorner", FOVFrame)
-Corner.CornerRadius = UDim.new(1,0)
+local corner = Instance.new("UICorner",FOV)
+corner.CornerRadius = UDim.new(1,0)
 
---// STORAGE
-local ESP = {}
-local LockedTarget = nil
-
---// ROLE
-local function GetRole(p, c)
-    if p.Team then return p.Team.Name end
-    return "Unknown"
+--// FUNCTIONS
+local function GetHealth(c)
+    local h=c:FindFirstChildOfClass("Humanoid")
+    return h and h.Health or 0
 end
 
---// COLORS
-local function GetRoleColor(role)
-    role = tostring(role):lower()
+local function IsVisible(part)
+    if not Config.WallCheck then return true end
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin)
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {LocalPlayer.Character}
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    local result = workspace:Raycast(origin, direction, params)
+    return not result or result.Instance:IsDescendantOf(part.Parent)
+end
 
+local function GetColor(role)
+    role=tostring(role):lower()
     if role:find("scp") then return Color3.fromRGB(255,105,180)
     elseif role:find("class") then return Color3.fromRGB(255,170,0)
     elseif role:find("guard") then return Color3.fromRGB(150,200,255)
@@ -69,47 +76,43 @@ local function GetRoleColor(role)
     elseif role:find("serpent") then return Color3.fromRGB(255,0,0)
     elseif role:find("mtf") then return Color3.fromRGB(0,120,255)
     end
-
     return Color3.fromRGB(255,255,255)
 end
 
---// HEALTH
-local function GetHealth(c)
-    local h = c:FindFirstChildOfClass("Humanoid")
-    return h and h.Health or 0
-end
-
 --// ESP
+local ESP = {}
 local function CreateESP(p)
-    if p == LocalPlayer then return end
+    if p==LocalPlayer then return end
 
-    local bill = Instance.new("BillboardGui")
-    bill.Size = UDim2.new(0,200,0,50)
-    bill.AlwaysOnTop = true
-    bill.Parent = game.CoreGui
+    local bill=Instance.new("BillboardGui")
+    bill.Size=UDim2.new(0,200,0,50)
+    bill.AlwaysOnTop=true
+    bill.Parent=game.CoreGui
 
-    local txt = Instance.new("TextLabel")
-    txt.Size = UDim2.new(1,0,1,0)
-    txt.BackgroundTransparency = 1
-    txt.TextScaled = true
-    txt.TextStrokeTransparency = 0
-    txt.Parent = bill
+    local txt=Instance.new("TextLabel")
+    txt.Size=UDim2.new(1,0,1,0)
+    txt.BackgroundTransparency=1
+    txt.TextScaled=true
+    txt.TextStrokeTransparency=0
+    txt.Parent=bill
 
-    ESP[p] = {GUI=bill,Text=txt}
+    ESP[p]={GUI=bill,Text=txt}
 end
 
 for _,p in pairs(Players:GetPlayers()) do CreateESP(p) end
 Players.PlayerAdded:Connect(CreateESP)
 
 --// TARGET
+local LockedTarget=nil
 local function GetTarget()
     local closest=nil
     local shortest=Config.FOV^2
 
     for _,p in pairs(Players:GetPlayers()) do
         if p~=LocalPlayer and p.Character then
-            local head=p.Character:FindFirstChild("Head")
-            if head and GetHealth(p.Character)>0 then
+            local c=p.Character
+            local head=c:FindFirstChild("Head")
+            if head and GetHealth(c)>0 and IsVisible(head) then
                 local pos,vis=Camera:WorldToViewportPoint(head.Position)
                 if vis then
                     local dx=pos.X-Camera.ViewportSize.X/2
@@ -128,37 +131,48 @@ local function GetTarget()
 end
 
 --// UI
-Combat:CreateToggle({
-    Name = "Aimbot (Head Lock)",
-    CurrentValue = false,
-    Callback = function(v) Config.Aimbot=v end
+Combat:CreateToggle({Name="Aimbot",Callback=function(v)Config.Aimbot=v end})
+Combat:CreateToggle({Name="Silent Aim (Safe)",Callback=function(v)Config.SilentAim=v end})
+Combat:CreateToggle({Name="Wall Check",Callback=function(v)Config.WallCheck=v end})
+Combat:CreateToggle({Name="Hitbox Expander",Callback=function(v)Config.Hitbox=v end})
+
+Combat:CreateSlider({
+    Name="Hitbox Size",
+    Range={2,20},
+    CurrentValue=5,
+    Callback=function(v)Config.HitboxSize=v end
 })
 
-Visual:CreateToggle({
-    Name = "ESP",
-    CurrentValue = true,
-    Callback = function(v) Config.ESP=v end
-})
+Visual:CreateToggle({Name="ESP",Callback=function(v)Config.ESP=v end})
 
 Visual:CreateSlider({
-    Name = "FOV Size",
-    Range = {50,400},
-    CurrentValue = 200,
-    Callback = function(v)
+    Name="FOV Size",
+    Range={50,400},
+    CurrentValue=200,
+    Callback=function(v)
         Config.FOV=v
-        FOVFrame.Size = UDim2.new(0,v,0,v)
+        FOV.Size=UDim2.new(0,v,0,v)
     end
 })
 
 --// LOOP
 RunService.RenderStepped:Connect(function()
 
-    FOVFrame.Visible = Config.ShowFOV and Config.Aimbot
+    FOV.Visible=Config.Aimbot
 
     GetTarget()
 
+    -- AIMBOT
     if Config.Aimbot and LockedTarget then
-        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position)
+        Camera.CFrame=CFrame.lookAt(Camera.CFrame.Position,LockedTarget.Position)
+    end
+
+    -- SILENT AIM (SAFE)
+    if Config.SilentAim and LockedTarget then
+        Camera.CFrame = Camera.CFrame:Lerp(
+            CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position),
+            0.3
+        )
     end
 
     for _,p in pairs(Players:GetPlayers()) do
@@ -173,13 +187,22 @@ RunService.RenderStepped:Connect(function()
                 continue
             end
 
-            local role=GetRole(p,c)
-            local color=GetRoleColor(role)
+            local hp=math.floor(GetHealth(c))
+            local dist=math.floor((root.Position-Camera.CFrame.Position).Magnitude)
+            local role=p.Team and p.Team.Name or "Unknown"
+            local color=GetColor(role)
 
             esp.GUI.Adornee=root
             esp.GUI.Enabled=true
-            esp.Text.Text=p.Name.." ["..role.."]"
+            esp.Text.Text=p.Name.." ["..role.."]\nHP: "..hp.." | "..dist.."m"
             esp.Text.TextColor3=color
+
+            -- HITBOX
+            if Config.Hitbox then
+                root.Size=Vector3.new(Config.HitboxSize,Config.HitboxSize,Config.HitboxSize)
+                root.Transparency=0.5
+                root.CanCollide=false
+            end
         end
     end
 
