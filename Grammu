@@ -7,7 +7,7 @@ local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 local correctKey = "SINEX_X555"
 
 --// MAIN
-local function startSINEX()
+function startSINEX()
 
 --// SERVICES
 local Players = game:GetService("Players")
@@ -191,19 +191,16 @@ Visual:CreateSlider({
 -- LOOP
 RunService.RenderStepped:Connect(function()
 
-    -- FOV
     FOVCircle.Radius = Config.FOV
     FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     FOVCircle.Visible = Config.Aimbot
 
     GetTarget()
 
-    -- AIMBOT
     if Config.Aimbot and LockedTarget then
         Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position)
     end
 
-    -- SILENT (SOFT)
     if Config.SilentAim and LockedTarget then
         Camera.CFrame = Camera.CFrame:Lerp(
             CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position),
@@ -211,7 +208,6 @@ RunService.RenderStepped:Connect(function()
         )
     end
 
-    -- ESP
     for _,p in pairs(Players:GetPlayers()) do
         if p~=LocalPlayer then
             local esp=ESP[p]
@@ -236,7 +232,6 @@ RunService.RenderStepped:Connect(function()
             esp.Text.Text=p.Name.." ["..role.."]\nHP: "..hp.." | "..dist.."m"
             esp.Text.TextColor3=color
 
-            -- HITBOX
             if Config.Hitbox then
                 root.Size=Vector3.new(Config.HitboxSize,Config.HitboxSize,Config.HitboxSize)
                 root.Transparency=0.5
@@ -249,7 +244,7 @@ end)
 
 end
 
--- KEY UI (FIXED)
+--// KEY UI
 local KeyWindow = Rayfield:CreateWindow({
     Name = "SINEX_X HUB - KEY",
     LoadingTitle = "Enter Key",
@@ -257,7 +252,7 @@ local KeyWindow = Rayfield:CreateWindow({
     ConfigurationSaving = {Enabled = false}
 })
 
-KeyWindow:CreateTextbox({
+KeyWindow:CreateInput({
     Name = "Enter Key",
     PlaceholderText = "Type key here...",
     RemoveTextAfterFocusLost = false,
@@ -271,6 +266,12 @@ KeyWindow:CreateTextbox({
             task.wait(1)
             KeyWindow:Destroy()
             startSINEX()
+        else
+            Rayfield:Notify({
+                Title = "Wrong Key ❌",
+                Content = "Try again",
+                Duration = 3
+            })
         end
     end
 })
