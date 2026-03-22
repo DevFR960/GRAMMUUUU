@@ -23,7 +23,6 @@ local Config = {
     Aimbot = true,
     SilentAim = false,
     WallCheck = true,
-    Hitbox = false,
     AntiRecoil = true,
     FOV = 200
 }
@@ -39,16 +38,14 @@ local Window = Rayfield:CreateWindow({
 local Combat = Window:CreateTab("Combat")
 local Visual = Window:CreateTab("Visual")
 
--- TOGGLES
 Combat:CreateToggle({Name="Aimbot",CurrentValue=true,Callback=function(v)Config.Aimbot=v end})
 Combat:CreateToggle({Name="Silent Aim",Callback=function(v)Config.SilentAim=v end})
 Combat:CreateToggle({Name="Wall Check",CurrentValue=true,Callback=function(v)Config.WallCheck=v end})
-Combat:CreateToggle({Name="Hitbox",Callback=function(v)Config.Hitbox=v end})
 Combat:CreateToggle({Name="Anti Recoil",CurrentValue=true,Callback=function(v)Config.AntiRecoil=v end})
 
 Visual:CreateToggle({Name="ESP",CurrentValue=true,Callback=function(v)Config.ESP=v end})
 
--- FOV CIRCLE
+-- FOV
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Thickness = 2
 FOVCircle.NumSides = 100
@@ -72,7 +69,7 @@ local function GetColor(role)
     return Color3.fromRGB(255,255,255)
 end
 
--- ALLIANCE SYSTEM (สำคัญ)
+-- ALLIANCE SYSTEM
 local Alliances = {
     Foundation = {"foundation","mtf","security","guard","fp","sd"},
     Chaos = {"chaos","ci","cd","class"},
@@ -126,7 +123,7 @@ local function CreateESP(p)
     if p == LocalPlayer then return end
 
     local bill = Instance.new("BillboardGui")
-    bill.Size = UDim2.new(0,200,0,50)
+    bill.Size = UDim2.new(0,200,0,60)
     bill.AlwaysOnTop = true
     bill.Parent = game.CoreGui
 
@@ -205,14 +202,22 @@ RunService.RenderStepped:Connect(function()
     for p,data in pairs(ESP) do
         if p and p.Character and Config.ESP then
             local root = p.Character:FindFirstChild("HumanoidRootPart")
+            local humanoid = p.Character:FindFirstChildOfClass("Humanoid")
 
-            if root then
+            if root and humanoid then
                 local role = GetRole(p)
                 local status = IsEnemy(p) and "ENEMY" or "FRIEND"
 
+                local hp = math.floor(humanoid.Health)
+                local dist = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
+
                 data.GUI.Adornee = root
                 data.GUI.Enabled = true
-                data.Text.Text = p.Name.." ["..role.."]\n"..status
+                data.Text.Text =
+                    p.Name.." ["..role.."]\n"..
+                    status.." | "..dist.."m\n"..
+                    "HP: "..hp
+
                 data.Text.TextColor3 = GetColor(role)
             end
         else
