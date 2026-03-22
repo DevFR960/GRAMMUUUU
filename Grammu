@@ -9,7 +9,7 @@ local correctKey = "SINEX_X555"
 function startSINEX()
 
 -- LOAD UI
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
 
 -- SERVICES
 local Players = game:GetService("Players")
@@ -22,18 +22,28 @@ local Config = {
     ESP = true,
     Aimbot = false,
     SilentAim = false,
-    TeamCheck = false,
+    TeamCheck = true,
+    ShootAll = false,
     WallCheck = false,
     Hitbox = false,
     HitboxSize = 5,
-    FOV = 200
+    FOV = 200,
+
+    SmartLock = true,
+    Smoothness = 0.2,
+    HitPart = "Head",
+    DynamicFOV = true,
+
+    AntiRecoil = true,
+    HardLock = false,
+    HeadPriority = true
 }
 
 -- UI
 local Window = Rayfield:CreateWindow({
-    Name = "SINEX_X HUB 💀",
+    Name = "SINEX_X HUB 💀 FINAL+",
     LoadingTitle = "Loading...",
-    LoadingSubtitle = "DELTA / XENO SAFE",
+    LoadingSubtitle = "RETROBREACH GOD MODE",
     ConfigurationSaving = {Enabled = false}
 })
 
@@ -53,18 +63,56 @@ local function GetHealth(c)
     return h and h.Health or 0
 end
 
-local function GetRole(p, char)
-    if p.Team and p.Team.Name ~= "" then
-        return p.Team.Name
+local function GetRole(p)
+    return (p.Team and p.Team.Name) or "Unknown"
+end
+
+-- NORMALIZE
+local function Normalize(role)
+    role = string.lower(role)
+    if role:find("serpent") then return "serpent" end
+    if role:find("scp") then return "scp" end
+    if role:find("mtf") then return "mtf" end
+    if role:find("security") then return "security" end
+    if role:find("facility") then return "facility" end
+    if role:find("chaos") then return "chaos" end
+    if role:find("class") then return "classd" end
+    return "unknown"
+end
+
+-- FRIEND SYSTEM
+local function IsFriendly(role1, role2)
+    role1 = Normalize(role1)
+    role2 = Normalize(role2)
+
+    if role1 == role2 then return true end
+
+    if (role1=="serpent" and role2=="scp") or (role1=="scp" and role2=="serpent") then
+        return true
     end
-    return "Unknown"
+
+    local g1 = (role1=="mtf" or role1=="security" or role1=="facility")
+    local g2 = (role2=="mtf" or role2=="security" or role2=="facility")
+    if g1 and g2 then return true end
+
+    if (role1=="chaos" and role2=="classd") or (role1=="classd" and role2=="chaos") then
+        return true
+    end
+
+    return false
+end
+
+local function IsEnemy(p)
+    if Config.ShootAll then return true end
+    if not Config.TeamCheck then return true end
+    return not IsFriendly(GetRole(LocalPlayer), GetRole(p))
 end
 
 local function GetColor(role)
     role = tostring(role):lower()
     if role:find("scp") then return Color3.fromRGB(255,105,180)
     elseif role:find("class") then return Color3.fromRGB(255,170,0)
-    elseif role:find("guard") then return Color3.fromRGB(220,240,255)
+    elseif role:find("security") then return Color3.fromRGB(220,240,255)
     elseif role:find("mtf") then return Color3.fromRGB(0,120,255)
     elseif role:find("chaos") then return Color3.fromRGB(0,200,0)
     elseif role:find("serpent") then return Color3.fromRGB(255,0,0)
@@ -72,14 +120,8 @@ local function GetColor(role)
     return Color3.fromRGB(255,255,255)
 end
 
-local function IsEnemy(p, char)
-    if not Config.TeamCheck then return true end
-    return GetRole(LocalPlayer, LocalPlayer.Character) ~= GetRole(p, char)
-end
-
 local function IsVisible(part)
     if not Config.WallCheck then return true end
-
     local origin = Camera.CFrame.Position
     local direction = (part.Position - origin)
 
@@ -91,7 +133,23 @@ local function IsVisible(part)
     return not result or result.Instance:IsDescendantOf(part.Parent)
 end
 
--- ESP SYSTEM
+-- HIT PART
+local function GetHitPart(char)
+    if Config.HeadPriority then
+        return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+    end
+
+    if Config.HitPart == "Head" then
+        return char:FindFirstChild("Head")
+    elseif Config.HitPart == "Root" then
+        return char:FindFirstChild("HumanoidRootPart")
+    else
+        local parts = {"Head","HumanoidRootPart"}
+        return char:FindFirstChild(parts[math.random(1,#parts)])
+    end
+end
+
+-- ESP
 local ESP = {}
 
 local function CreateESP(p)
@@ -116,37 +174,41 @@ end
 for _,p in pairs(Players:GetPlayers()) do CreateESP(p) end
 Players.PlayerAdded:Connect(CreateESP)
 
--- FIX ESP REMOVE
-Players.PlayerRemoving:Connect(function(p)
-    if ESP[p] then
-        if ESP[p].GUI then ESP[p].GUI:Destroy() end
-        ESP[p] = nil
-    end
-end)
-
 -- TARGET
 local LockedTarget = nil
 
 local function GetTarget()
+    if Config.SmartLock and LockedTarget then
+        local char = LockedTarget.Parent
+        if char and GetHealth(char) > 0 and IsVisible(LockedTarget) then
+            return
+        end
+    end
+
     local closest = nil
-    local shortest = Config.FOV^2
+    local shortest = Config.FOV * Config.FOV
 
     for _,p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
+        if p ~= LocalPlayer and p.Character and IsEnemy(p) then
             local c = p.Character
-            local head = c:FindFirstChild("Head")
+            local part = GetHitPart(c)
 
-            if head and GetHealth(c) > 0 and IsEnemy(p,c) and IsVisible(head) then
-                local pos,vis = Camera:WorldToViewportPoint(head.Position)
+            if part and GetHealth(c) > 0 and IsVisible(part) then
+                local pos,vis = Camera:WorldToViewportPoint(part.Position)
 
                 if vis then
                     local dx = pos.X - Camera.ViewportSize.X/2
                     local dy = pos.Y - Camera.ViewportSize.Y/2
                     local dist = dx*dx + dy*dy
 
-                    if dist < shortest then
+                    local fov = Config.FOV
+                    if Config.DynamicFOV then
+                        fov = fov * (1 + (part.Position - Camera.CFrame.Position).Magnitude/100)
+                    end
+
+                    if dist < (fov*fov) and dist < shortest then
                         shortest = dist
-                        closest = head
+                        closest = part
                     end
                 end
             end
@@ -159,9 +221,13 @@ end
 -- UI
 Combat:CreateToggle({Name="Aimbot",Callback=function(v)Config.Aimbot=v end})
 Combat:CreateToggle({Name="Silent Aim",Callback=function(v)Config.SilentAim=v end})
-Combat:CreateToggle({Name="Team Check",Callback=function(v)Config.TeamCheck=v end})
+Combat:CreateToggle({Name="Team Check",CurrentValue=true,Callback=function(v)Config.TeamCheck=v end})
+Combat:CreateToggle({Name="Shoot Everyone",Callback=function(v)Config.ShootAll=v end})
 Combat:CreateToggle({Name="Wall Check",Callback=function(v)Config.WallCheck=v end})
 Combat:CreateToggle({Name="Hitbox",Callback=function(v)Config.Hitbox=v end})
+Combat:CreateToggle({Name="Anti Recoil",Callback=function(v)Config.AntiRecoil=v end})
+Combat:CreateToggle({Name="Hard Lock",Callback=function(v)Config.HardLock=v end})
+Combat:CreateToggle({Name="Head Priority",CurrentValue=true,Callback=function(v)Config.HeadPriority=v end})
 
 Combat:CreateSlider({
     Name="Hitbox Size",
@@ -170,7 +236,22 @@ Combat:CreateSlider({
     Callback=function(v)Config.HitboxSize=v end
 })
 
-Visual:CreateToggle({Name="ESP",Callback=function(v)Config.ESP=v end})
+Combat:CreateSlider({
+    Name="Smoothness",
+    Range={0,1},
+    Increment=0.05,
+    CurrentValue=0.2,
+    Callback=function(v)Config.Smoothness=v end
+})
+
+Combat:CreateDropdown({
+    Name="Hit Part",
+    Options={"Head","Root","Random"},
+    CurrentOption="Head",
+    Callback=function(v)Config.HitPart=v end
+})
+
+Visual:CreateToggle({Name="ESP",CurrentValue=true,Callback=function(v)Config.ESP=v end})
 
 Visual:CreateSlider({
     Name="FOV",
@@ -179,23 +260,27 @@ Visual:CreateSlider({
     Callback=function(v)Config.FOV=v end
 })
 
--- OPTIMIZED LOOP
-local last = 0
-
+-- LOOP
 RunService.RenderStepped:Connect(function()
-    if tick() - last < 0.05 then return end
-    last = tick()
 
-    -- FOV
     FOVCircle.Radius = Config.FOV
     FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    FOVCircle.Visible = Config.Aimbot
+    FOVCircle.Visible = true
 
     GetTarget()
 
-    -- AIMBOT
     if Config.Aimbot and LockedTarget then
-        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position)
+        local targetCF = CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position)
+
+        if Config.HardLock then
+            Camera.CFrame = targetCF
+        else
+            Camera.CFrame = Camera.CFrame:Lerp(targetCF, Config.Smoothness)
+        end
+
+        if Config.AntiRecoil then
+            Camera.CFrame = targetCF
+        end
     end
 
     if Config.SilentAim and LockedTarget then
@@ -205,51 +290,31 @@ RunService.RenderStepped:Connect(function()
         )
     end
 
-    -- ESP OFF
-    if not Config.ESP then
-        for _,v in pairs(ESP) do
-            if v.GUI then v.GUI.Enabled = false end
-        end
-    end
-
-    -- PLAYER LOOP
     for p,esp in pairs(ESP) do
-        if not p or not p.Parent then
-            if esp.GUI then esp.GUI:Destroy() end
-            ESP[p] = nil
-            continue
-        end
-
         local c = p.Character
-        if not c then
-            esp.GUI.Enabled = false
-            continue
-        end
+        if not c then esp.GUI.Enabled=false continue end
 
         local root = c:FindFirstChild("HumanoidRootPart")
 
-        if not root or GetHealth(c) <= 0 or not Config.ESP or not IsEnemy(p,c) then
-            esp.GUI.Enabled = false
+        if not root or GetHealth(c)<=0 or not Config.ESP then
+            esp.GUI.Enabled=false
         else
             local hp = math.floor(GetHealth(c))
             local dist = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
-            local role = GetRole(p,c)
+            local role = GetRole(p)
+
+            local status = IsFriendly(GetRole(LocalPlayer), role) and "🤝 FRIEND" or "⚔️ ENEMY"
 
             esp.GUI.Adornee = root
             esp.GUI.Enabled = true
-            esp.Text.Text = p.Name.." ["..role.."]\nHP: "..hp.." | "..dist.."m"
+            esp.Text.Text = p.Name.." ["..role.."]\n"..status.."\nHP: "..hp.." | "..dist.."m"
             esp.Text.TextColor3 = GetColor(role)
         end
 
-        -- HITBOX
         if Config.Hitbox and root then
             root.Size = Vector3.new(Config.HitboxSize,Config.HitboxSize,Config.HitboxSize)
             root.Transparency = 0.5
             root.CanCollide = false
-        elseif root then
-            root.Size = Vector3.new(2,2,1)
-            root.Transparency = 0
-            root.CanCollide = true
         end
     end
 end)
@@ -258,20 +323,11 @@ end
 
 -- KEY UI
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-ScreenGui.Name = "SINEX_KEY"
-
 local Frame = Instance.new("Frame", ScreenGui)
 Frame.Size = UDim2.new(0,300,0,150)
 Frame.Position = UDim2.new(0.5,-150,0.5,-75)
 Frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
 Instance.new("UICorner", Frame)
-
-local Title = Instance.new("TextLabel", Frame)
-Title.Size = UDim2.new(1,0,0,40)
-Title.BackgroundTransparency = 1
-Title.Text = "SINEX_X HUB KEY"
-Title.TextColor3 = Color3.fromRGB(255,255,255)
-Title.TextScaled = true
 
 local Box = Instance.new("TextBox", Frame)
 Box.Size = UDim2.new(0.8,0,0,40)
