@@ -20,20 +20,18 @@ local Camera = workspace.CurrentCamera
 -- CONFIG
 local Config = {
     ESP = true,
-    Aimbot = false,
+    Aimbot = true,
     SilentAim = false,
+    WallCheck = true,
     Hitbox = false,
     AntiRecoil = true,
-    WallCheck = false,
-    ShootEveryone = false,
-    HitboxSize = 5,
     FOV = 200
 }
 
 -- UI
 local Window = Rayfield:CreateWindow({
     Name = "SINEX_X HUB 💀 FINAL",
-    LoadingTitle = "Loading...",
+    LoadingTitle = "SINEX",
     LoadingSubtitle = "SCP Retrobreach",
     ConfigurationSaving = {Enabled = false}
 })
@@ -41,22 +39,14 @@ local Window = Rayfield:CreateWindow({
 local Combat = Window:CreateTab("Combat")
 local Visual = Window:CreateTab("Visual")
 
--- UI CONTROLS
-Combat:CreateToggle({Name="Aimbot",Callback=function(v)Config.Aimbot=v end})
+-- TOGGLES
+Combat:CreateToggle({Name="Aimbot",CurrentValue=true,Callback=function(v)Config.Aimbot=v end})
 Combat:CreateToggle({Name="Silent Aim",Callback=function(v)Config.SilentAim=v end})
-Combat:CreateToggle({Name="Shoot Everyone",Callback=function(v)Config.ShootEveryone=v end})
-Combat:CreateToggle({Name="Wall Check",Callback=function(v)Config.WallCheck=v end})
+Combat:CreateToggle({Name="Wall Check",CurrentValue=true,Callback=function(v)Config.WallCheck=v end})
 Combat:CreateToggle({Name="Hitbox",Callback=function(v)Config.Hitbox=v end})
-Combat:CreateToggle({Name="Anti Recoil",Callback=function(v)Config.AntiRecoil=v end})
+Combat:CreateToggle({Name="Anti Recoil",CurrentValue=true,Callback=function(v)Config.AntiRecoil=v end})
 
-Combat:CreateSlider({
-    Name="Hitbox Size",
-    Range={2,20},
-    CurrentValue=5,
-    Callback=function(v)Config.HitboxSize=v end
-})
-
-Visual:CreateToggle({Name="ESP",Callback=function(v)Config.ESP=v end})
+Visual:CreateToggle({Name="ESP",CurrentValue=true,Callback=function(v)Config.ESP=v end})
 
 -- FOV CIRCLE
 local FOVCircle = Drawing.new("Circle")
@@ -65,75 +55,53 @@ FOVCircle.NumSides = 100
 FOVCircle.Filled = false
 FOVCircle.Color = Color3.fromRGB(0,255,255)
 
--- FUNCTIONS
-local function GetHealth(c)
-    local h = c:FindFirstChildOfClass("Humanoid")
-    return h and h.Health or 0
-end
-
-local function GetRole(p)
-    return (p.Team and p.Team.Name) or "Unknown"
-end
-
--- ROLE COLOR (FIXED)
+-- ROLE COLOR (ตรงแมพ)
 local function GetColor(role)
-    role = string.lower(role)
+    role = role:lower()
 
-    if role:find("scp") then
-        return Color3.fromRGB(255,80,80)
-    elseif role:find("serpent") then
-        return Color3.fromRGB(255,0,255)
-    elseif role:find("chaos") or role:find("ci") then
-        return Color3.fromRGB(0,255,0)
-    elseif role:find("class") or role:find("cd") then
-        return Color3.fromRGB(255,170,0)
-    elseif role:find("mtf") then
-        return Color3.fromRGB(0,170,255)
-    elseif role:find("security") or role:find("sd") then
-        return Color3.fromRGB(180,220,255)
-    elseif role:find("foundation") or role:find("fp") then
-        return Color3.fromRGB(255,255,255)
+    if role:find("class") then return Color3.fromRGB(255,170,0)
+    elseif role:find("foundation") then return Color3.fromRGB(255,255,255)
+    elseif role:find("security") then return Color3.fromRGB(0,170,255)
+    elseif role:find("mtf") then return Color3.fromRGB(0,120,255)
+    elseif role:find("chaos") then return Color3.fromRGB(0,255,0)
+    elseif role:find("goc") then return Color3.fromRGB(255,255,0)
+    elseif role:find("serpent") then return Color3.fromRGB(255,0,0)
+    elseif role:find("scp") then return Color3.fromRGB(255,105,180)
     end
 
     return Color3.fromRGB(255,255,255)
 end
 
--- FRIEND SYSTEM
-local function IsFriendly(role1, role2)
-    role1 = string.lower(role1)
-    role2 = string.lower(role2)
+-- ALLIANCE SYSTEM (สำคัญ)
+local Alliances = {
+    Foundation = {"foundation","mtf","security","guard","fp","sd"},
+    Chaos = {"chaos","ci","cd","class"},
+    SCP = {"scp","serpent"},
+    Neutral = {"goc"}
+}
 
-    if role1:find("scp") and role2:find("serpent") then return true end
-    if role1:find("serpent") and role2:find("scp") then return true end
+local function GetRole(p)
+    return (p.Team and p.Team.Name) or "Unknown"
+end
 
-    if (role1:find("mtf") or role1:find("security") or role1:find("foundation")) then
-        if (role2:find("mtf") or role2:find("security") or role2:find("foundation")) then
-            return true
+local function GetAlliance(role)
+    role = role:lower()
+
+    for name,list in pairs(Alliances) do
+        for _,k in pairs(list) do
+            if role:find(k) then
+                return name
+            end
         end
     end
 
-    if role1:find("chaos") or role1:find("ci") then
-        if role2:find("class") or role2:find("cd") then
-            return true
-        end
-    end
-
-    if role1:find("class") or role1:find("cd") then
-        if role2:find("chaos") or role2:find("ci") then
-            return true
-        end
-    end
-
-    return false
+    return "Unknown"
 end
 
 local function IsEnemy(p)
-    if Config.ShootEveryone then return true end
-
-    local myRole = GetRole(LocalPlayer)
-    local theirRole = GetRole(p)
-
-    return not IsFriendly(myRole, theirRole)
+    local my = GetAlliance(GetRole(LocalPlayer))
+    local target = GetAlliance(GetRole(p))
+    return my ~= target
 end
 
 -- WALL CHECK
@@ -141,13 +109,13 @@ local function IsVisible(part)
     if not Config.WallCheck then return true end
 
     local origin = Camera.CFrame.Position
-    local direction = (part.Position - origin)
+    local dir = (part.Position - origin)
 
     local params = RaycastParams.new()
     params.FilterDescendantsInstances = {LocalPlayer.Character}
     params.FilterType = Enum.RaycastFilterType.Blacklist
 
-    local result = workspace:Raycast(origin, direction, params)
+    local result = workspace:Raycast(origin, dir, params)
     return not result or result.Instance:IsDescendantOf(part.Parent)
 end
 
@@ -179,24 +147,22 @@ Players.PlayerAdded:Connect(CreateESP)
 local LockedTarget = nil
 
 local function GetTarget()
-    local closest = nil
-    local shortest = Config.FOV^2
+    local closest,dist = nil,Config.FOV^2
 
     for _,p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            local c = p.Character
-            local head = c:FindFirstChild("Head")
+        if p ~= LocalPlayer and p.Character and IsEnemy(p) then
+            local head = p.Character:FindFirstChild("Head")
 
-            if head and GetHealth(c) > 0 and IsEnemy(p) and IsVisible(head) then
+            if head and IsVisible(head) then
                 local pos,vis = Camera:WorldToViewportPoint(head.Position)
 
                 if vis then
                     local dx = pos.X - Camera.ViewportSize.X/2
                     local dy = pos.Y - Camera.ViewportSize.Y/2
-                    local dist = dx*dx + dy*dy
+                    local mag = dx*dx + dy*dy
 
-                    if dist < shortest then
-                        shortest = dist
+                    if mag < dist then
+                        dist = mag
                         closest = head
                     end
                 end
@@ -212,53 +178,47 @@ RunService.RenderStepped:Connect(function()
 
     -- FOV
     FOVCircle.Radius = Config.FOV
-    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)
     FOVCircle.Visible = Config.Aimbot
 
     GetTarget()
 
     -- AIMBOT
     if Config.Aimbot and LockedTarget then
-        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position)
+        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position,LockedTarget.Position)
     end
 
+    -- SILENT
     if Config.SilentAim and LockedTarget then
         Camera.CFrame = Camera.CFrame:Lerp(
-            CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position),
-            0.25
+            CFrame.lookAt(Camera.CFrame.Position,LockedTarget.Position),
+            0.2
         )
     end
 
     -- ANTI RECOIL
     if Config.AntiRecoil then
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + Camera.CFrame.LookVector)
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position,Camera.CFrame.Position + Camera.CFrame.LookVector)
     end
 
-    -- ESP
-    for _,p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            local esp = ESP[p]
-            local c = p.Character
+    -- ESP LOOP
+    for p,data in pairs(ESP) do
+        if p and p.Character and Config.ESP then
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
 
-            if not esp or not c then continue end
+            if root then
+                local role = GetRole(p)
+                local status = IsEnemy(p) and "ENEMY" or "FRIEND"
 
-            local root = c:FindFirstChild("HumanoidRootPart")
-
-            if not root or GetHealth(c) <= 0 or not Config.ESP then
-                esp.GUI.Enabled = false
-                continue
+                data.GUI.Adornee = root
+                data.GUI.Enabled = true
+                data.Text.Text = p.Name.." ["..role.."]\n"..status
+                data.Text.TextColor3 = GetColor(role)
             end
-
-            local role = GetRole(p)
-            local status = IsEnemy(p) and "ENEMY" or "FRIEND"
-
-            esp.GUI.Adornee = root
-            esp.GUI.Enabled = true
-            esp.Text.Text = p.Name.." ["..role.."]\n"..status
-            esp.Text.TextColor3 = GetColor(role)
+        else
+            if data.GUI then data.GUI.Enabled = false end
         end
     end
-
 end)
 
 end
