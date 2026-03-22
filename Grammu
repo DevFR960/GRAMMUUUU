@@ -75,7 +75,30 @@ local function GetRole(p)
     return (p.Team and p.Team.Name) or "Unknown"
 end
 
--- FRIEND SYSTEM (SCP Retrobreach)
+-- ROLE COLOR (FIXED)
+local function GetColor(role)
+    role = string.lower(role)
+
+    if role:find("scp") then
+        return Color3.fromRGB(255,80,80)
+    elseif role:find("serpent") then
+        return Color3.fromRGB(255,0,255)
+    elseif role:find("chaos") or role:find("ci") then
+        return Color3.fromRGB(0,255,0)
+    elseif role:find("class") or role:find("cd") then
+        return Color3.fromRGB(255,170,0)
+    elseif role:find("mtf") then
+        return Color3.fromRGB(0,170,255)
+    elseif role:find("security") or role:find("sd") then
+        return Color3.fromRGB(180,220,255)
+    elseif role:find("foundation") or role:find("fp") then
+        return Color3.fromRGB(255,255,255)
+    end
+
+    return Color3.fromRGB(255,255,255)
+end
+
+-- FRIEND SYSTEM
 local function IsFriendly(role1, role2)
     role1 = string.lower(role1)
     role2 = string.lower(role2)
@@ -83,14 +106,23 @@ local function IsFriendly(role1, role2)
     if role1:find("scp") and role2:find("serpent") then return true end
     if role1:find("serpent") and role2:find("scp") then return true end
 
-    if role1:find("mtf") or role1:find("security") or role1:find("foundation") then
-        if role2:find("mtf") or role2:find("security") or role2:find("foundation") then
+    if (role1:find("mtf") or role1:find("security") or role1:find("foundation")) then
+        if (role2:find("mtf") or role2:find("security") or role2:find("foundation")) then
             return true
         end
     end
 
-    if role1:find("chaos") and role2:find("class") then return true end
-    if role1:find("class") and role2:find("chaos") then return true end
+    if role1:find("chaos") or role1:find("ci") then
+        if role2:find("class") or role2:find("cd") then
+            return true
+        end
+    end
+
+    if role1:find("class") or role1:find("cd") then
+        if role2:find("chaos") or role2:find("ci") then
+            return true
+        end
+    end
 
     return false
 end
@@ -104,6 +136,7 @@ local function IsEnemy(p)
     return not IsFriendly(myRole, theirRole)
 end
 
+-- WALL CHECK
 local function IsVisible(part)
     if not Config.WallCheck then return true end
 
@@ -118,7 +151,7 @@ local function IsVisible(part)
     return not result or result.Instance:IsDescendantOf(part.Parent)
 end
 
--- ESP SYSTEM
+-- ESP
 local ESP = {}
 
 local function CreateESP(p)
@@ -222,6 +255,7 @@ RunService.RenderStepped:Connect(function()
             esp.GUI.Adornee = root
             esp.GUI.Enabled = true
             esp.Text.Text = p.Name.." ["..role.."]\n"..status
+            esp.Text.TextColor3 = GetColor(role)
         end
     end
 
