@@ -8,66 +8,40 @@ local correctKey = "SINEX_X555"
 
 function startSINEX()
 
--- 🔥 LOAD RAYFIELD (กันพัง)
-local success, Rayfield = pcall(function()
-    return loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
-end)
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
-if not success or not Rayfield then
-    warn("❌ Rayfield โหลดไม่ได้")
-    return
-end
-
--- SERVICES
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- CONFIG
 local Config = {
     ESP = true,
     Aimbot = false,
-    SilentAim = false,
-    TeamCheck = true,
-    ShootAll = false,
-    WallCheck = false,
+    ShootEveryone = false,
     Hitbox = false,
-    HitboxSize = 5,
-    FOV = 200,
-
-    Smoothness = 0.2,
-    HitPart = "Head",
-
     AntiRecoil = true,
-    HardLock = false,
-    HeadPriority = true
+    HardLock = true,
+    FOV = 200
 }
 
 -- UI
 local Window = Rayfield:CreateWindow({
     Name = "SINEX_X HUB 💀 FINAL",
     LoadingTitle = "Loading...",
-    LoadingSubtitle = "DELTA / XENO READY",
+    LoadingSubtitle = "RETROBREACH OP",
     ConfigurationSaving = {Enabled = false}
 })
 
 local Combat = Window:CreateTab("Combat")
 local Visual = Window:CreateTab("Visual")
 
--- 🔥 DRAWING FIX
-local DrawingSupported = pcall(function()
-    return Drawing.new("Circle")
-end)
-
-local FOVCircle
-if DrawingSupported then
-    FOVCircle = Drawing.new("Circle")
-    FOVCircle.Thickness = 2
-    FOVCircle.NumSides = 100
-    FOVCircle.Filled = false
-    FOVCircle.Color = Color3.fromRGB(0,255,255)
-end
+-- FOV
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2
+FOVCircle.NumSides = 100
+FOVCircle.Filled = false
+FOVCircle.Color = Color3.fromRGB(0,255,255)
 
 -- FUNCTIONS
 local function GetHealth(c)
@@ -79,50 +53,41 @@ local function GetRole(p)
     return (p.Team and p.Team.Name) or "Unknown"
 end
 
-local function Normalize(role)
-    role = string.lower(role)
-    if role:find("serpent") then return "serpent" end
-    if role:find("scp") then return "scp" end
-    if role:find("mtf") then return "mtf" end
-    if role:find("security") then return "security" end
-    if role:find("facility") then return "facility" end
-    if role:find("chaos") then return "chaos" end
-    if role:find("class") then return "classd" end
-    return "unknown"
+-- 🎨 สี Role ตรงเกม
+local function GetColor(role)
+    role = role:lower()
+    if role:find("class") then return Color3.fromRGB(255,140,0)
+    elseif role:find("security") then return Color3.fromRGB(0,170,255)
+    elseif role:find("mtf") then return Color3.fromRGB(0,85,255)
+    elseif role:find("facility") then return Color3.fromRGB(0,200,255)
+    elseif role:find("chaos") then return Color3.fromRGB(0,255,0)
+    elseif role:find("serpent") then return Color3.fromRGB(170,0,255)
+    elseif role:find("goc") then return Color3.fromRGB(255,255,255)
+    elseif role:find("scp") then return Color3.fromRGB(255,0,0)
+    end
+    return Color3.fromRGB(255,255,255)
 end
 
-local function IsFriendly(role1, role2)
-    role1 = Normalize(role1)
-    role2 = Normalize(role2)
+-- 🤝 ทีม
+local function IsFriendly(a, b)
+    a = a:lower()
+    b = b:lower()
 
-    if role1 == role2 then return true end
-    if (role1=="serpent" and role2=="scp") or (role1=="scp" and role2=="serpent") then return true end
+    if (a:find("scp") and b:find("serpent")) or (a:find("serpent") and b:find("scp")) then return true end
 
-    local g1 = (role1=="mtf" or role1=="security" or role1=="facility")
-    local g2 = (role2=="mtf" or role2=="security" or role2=="facility")
-    if g1 and g2 then return true end
+    if (a:find("mtf") or a:find("security") or a:find("facility")) and
+       (b:find("mtf") or b:find("security") or b:find("facility")) then return true end
 
-    if (role1=="chaos" and role2=="classd") or (role1=="classd" and role2=="chaos") then return true end
+    if (a:find("chaos") and b:find("class")) or (a:find("class") and b:find("chaos")) then return true end
 
     return false
 end
 
 local function IsEnemy(p)
-    if Config.ShootAll then return true end
-    if not Config.TeamCheck then return true end
-    return not IsFriendly(GetRole(LocalPlayer), GetRole(p))
-end
-
-local function GetHitPart(char)
-    if Config.HeadPriority then
-        return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-    end
-
-    if Config.HitPart == "Head" then
-        return char:FindFirstChild("Head")
-    else
-        return char:FindFirstChild("HumanoidRootPart")
-    end
+    if Config.ShootEveryone then return true end
+    local myRole = GetRole(LocalPlayer)
+    local role = GetRole(p)
+    return not IsFriendly(myRole, role)
 end
 
 -- ESP
@@ -132,7 +97,7 @@ local function CreateESP(p)
     if p == LocalPlayer then return end
 
     local bill = Instance.new("BillboardGui")
-    bill.Size = UDim2.new(0,200,0,50)
+    bill.Size = UDim2.new(0,200,0,60)
     bill.AlwaysOnTop = true
     bill.Parent = game.CoreGui
 
@@ -153,17 +118,14 @@ Players.PlayerAdded:Connect(CreateESP)
 local LockedTarget = nil
 
 local function GetTarget()
-    local closest = nil
-    local shortest = Config.FOV * Config.FOV
+    local closest, shortest = nil, Config.FOV^2
 
     for _,p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and IsEnemy(p) then
-            local c = p.Character
-            local part = GetHitPart(c)
+            local head = p.Character:FindFirstChild("Head")
+            if head and GetHealth(p.Character) > 0 then
 
-            if part and GetHealth(c) > 0 then
-                local pos,vis = Camera:WorldToViewportPoint(part.Position)
-
+                local pos,vis = Camera:WorldToViewportPoint(head.Position)
                 if vis then
                     local dx = pos.X - Camera.ViewportSize.X/2
                     local dy = pos.Y - Camera.ViewportSize.Y/2
@@ -171,7 +133,7 @@ local function GetTarget()
 
                     if dist < shortest then
                         shortest = dist
-                        closest = part
+                        closest = head
                     end
                 end
             end
@@ -181,75 +143,76 @@ local function GetTarget()
     LockedTarget = closest
 end
 
--- UI
+-- UI Controls
 Combat:CreateToggle({Name="Aimbot",Callback=function(v)Config.Aimbot=v end})
-Combat:CreateToggle({Name="Shoot Everyone",Callback=function(v)Config.ShootAll=v end})
+Combat:CreateToggle({Name="Shoot Everyone",Callback=function(v)Config.ShootEveryone=v end})
 Combat:CreateToggle({Name="Hitbox",Callback=function(v)Config.Hitbox=v end})
 Combat:CreateToggle({Name="Anti Recoil",Callback=function(v)Config.AntiRecoil=v end})
 Combat:CreateToggle({Name="Hard Lock",Callback=function(v)Config.HardLock=v end})
 
 Visual:CreateToggle({Name="ESP",Callback=function(v)Config.ESP=v end})
 
+Visual:CreateSlider({
+    Name="FOV",
+    Range={50,400},
+    CurrentValue=200,
+    Callback=function(v)Config.FOV=v end
+})
+
 -- LOOP
 RunService.RenderStepped:Connect(function()
 
-    if DrawingSupported and FOVCircle then
-        FOVCircle.Radius = Config.FOV
-        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-        FOVCircle.Visible = true
-    end
+    FOVCircle.Radius = Config.FOV
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    FOVCircle.Visible = Config.Aimbot
 
     GetTarget()
 
     if Config.Aimbot and LockedTarget then
-        local targetCF = CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position)
+        local aim = CFrame.lookAt(Camera.CFrame.Position, LockedTarget.Position)
 
         if Config.HardLock then
-            Camera.CFrame = targetCF
+            Camera.CFrame = aim
         else
-            Camera.CFrame = Camera.CFrame:Lerp(targetCF, Config.Smoothness)
-        end
-
-        if Config.AntiRecoil then
-            Camera.CFrame = targetCF
+            Camera.CFrame = Camera.CFrame:Lerp(aim, 0.2)
         end
     end
 
+    -- Anti recoil
+    if Config.AntiRecoil then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + Camera.CFrame.LookVector)
+    end
+
+    -- ESP
     for p,esp in pairs(ESP) do
-        local c = p.Character
-        if not c then continue end
+        if p and p.Character then
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
 
-        local root = c:FindFirstChild("HumanoidRootPart")
+            if root and GetHealth(p.Character) > 0 and Config.ESP then
+                local role = GetRole(p)
+                local myRole = GetRole(LocalPlayer)
+                local status = IsFriendly(myRole, role) and "🤝 FRIEND" or "⚔️ ENEMY"
 
-        if root and GetHealth(c) > 0 and Config.ESP then
-            local role = GetRole(p)
-            local status = IsFriendly(GetRole(LocalPlayer), role) and "🤝 FRIEND" or "⚔️ ENEMY"
-
-            esp.GUI.Adornee = root
-            esp.GUI.Enabled = true
-            esp.Text.Text = p.Name.." ["..role.."]\n"..status
-        else
-            esp.GUI.Enabled = false
-        end
-
-        if Config.Hitbox and root then
-            root.Size = Vector3.new(10,10,10)
-            root.Transparency = 0.5
-            root.CanCollide = false
+                esp.GUI.Adornee = root
+                esp.GUI.Enabled = true
+                esp.Text.Text = p.Name.." ["..role.."]\n"..status
+                esp.Text.TextColor3 = GetColor(role)
+            else
+                esp.GUI.Enabled = false
+            end
         end
     end
 end)
 
 end
 
--- 🔥 KEY UI (FIXED)
-local ScreenGui = Instance.new("ScreenGui")
+-- KEY UI
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 ScreenGui.Name = "SINEX_KEY"
-ScreenGui.Parent = game.CoreGui
 
 local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0,300,0,170)
-Frame.Position = UDim2.new(0.5,-150,0.5,-85)
+Frame.Size = UDim2.new(0,300,0,150)
+Frame.Position = UDim2.new(0.5,-150,0.5,-75)
 Frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
 Instance.new("UICorner", Frame)
 
@@ -262,13 +225,12 @@ Title.TextScaled = true
 
 local Box = Instance.new("TextBox", Frame)
 Box.Size = UDim2.new(0.8,0,0,40)
-Box.Position = UDim2.new(0.1,0,0.35,0)
+Box.Position = UDim2.new(0.1,0,0.4,0)
 Box.PlaceholderText = "Enter Key..."
-Box.Text = ""
 
 local Btn = Instance.new("TextButton", Frame)
 Btn.Size = UDim2.new(0.6,0,0,35)
-Btn.Position = UDim2.new(0.2,0,0.7,0)
+Btn.Position = UDim2.new(0.2,0,0.75,0)
 Btn.Text = "ENTER"
 
 Btn.MouseButton1Click:Connect(function()
